@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+IFS=$'\n\t'
+
+# [ -z "${DEBUG}" ] & [ "${DEBUG}" == 1 ] && set -o xtrace
+
+__dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$__dir"
+
+homebrew_url="https://raw.githubusercontent.com/Homebrew/install/master/install.sh"
+pip_url="https://bootstrap.pypa.io/get-pip.py"
+
+install_homebrew() {
+	echo "Installing Homebrew."
+	if [ ! -x "$(command -v brew)" ]; then
+		xcode-select --install > /dev/null 2>&1
+		curl -fsSL $homebrew_url | bash > /dev/null 2>&1
+	else
+		echo "Homebrew is already installed."
+	fi
+}
+
+install_dependencies() {
+	echo "Installing Dependencies"
+	dependencies=( python3 git mariadb redis node )
+	for dependency in "${dependencies[@]}"; do
+		if brew ls --versions "$dependency" > /dev/null; then
+			echo "$dependency is already installed."
+		else
+			echo "Installing $dependency."
+			brew install "$dependency"
+		fi
+	done
+}
+
+install_bench() {
+	if [ ! -x "$(command -v bench)" ]; then
+		if [ ! -x "$(command -v pip3)" ]; then
+			echo "pip is not installed. Installing pip."
+			curl -fsSL $pip_url | python3 > /dev/null 2>&1
+		else
+			echo "pip is already Installed."
+		fi
+
+		echo "Installing Bench."
+		pip3 install -qu frappe-bench
+	else
+		echo "Bench is already installed."
+	fi
+}
+
+setup_mariadb_help() {
+	echo "
+
+All required packages have been installed. To configure mariadb, please add the following
+lines to /usr/local/etc/my.cnf
+
+
+[mysqld]
+character-set-client-handshake = FALSE
+character-set-server = utf8mb4
+collation-server = utf8mb4_unicode_ci
+
+[mysql]
+default-character-set = utf8mb4
+
+
+After the configuration is setup, you will need to setup the MariaDB Root Password. Run the
+following command to set it up:
+
+$ mysql_secure_installation
+
+and follow the setup steps. You will also need to start the MariaDB server before you run
+any bench command:
+
+$ mysql.server start"
+}
+
+install_homebrew
+install_dependencies
+install_bench
+setup_mariadb_help
